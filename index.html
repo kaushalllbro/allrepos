@@ -3,72 +3,172 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>GitHub JSON URL Saver</title>
+<title>GitHub URL Manager</title>
 
 <style>
+
+*{
+  margin:0;
+  padding:0;
+  box-sizing:border-box;
+  font-family:Arial,sans-serif;
+}
+
 body{
   background:#0f1117;
   color:white;
-  font-family:Arial;
   padding:20px;
 }
 
-input{
+.container{
+  max-width:900px;
+  margin:auto;
+}
+
+h1{
+  margin-bottom:20px;
+  font-size:32px;
+}
+
+.card{
+  background:#1a1d26;
+  padding:20px;
+  border-radius:15px;
+  margin-bottom:20px;
+}
+
+textarea{
   width:100%;
-  padding:14px;
+  height:180px;
+  padding:15px;
   border:none;
-  border-radius:10px;
-  margin-bottom:10px;
-  background:#1f2937;
+  outline:none;
+  border-radius:12px;
+  background:#0b0d12;
   color:white;
+  resize:vertical;
+  margin-top:15px;
+  font-size:15px;
 }
 
 button{
-  padding:12px 20px;
-  border:none;
-  border-radius:10px;
-  cursor:pointer;
   background:#4f46e5;
   color:white;
-  font-size:16px;
-}
-
-#list{
-  margin-top:20px;
-}
-
-.item{
-  background:#1a1d26;
-  padding:12px;
-  margin-top:10px;
+  border:none;
+  padding:12px 22px;
   border-radius:10px;
-  word-break:break-all;
+  cursor:pointer;
+  font-size:16px;
+  margin-top:15px;
 }
+
+button:hover{
+  opacity:0.9;
+}
+
+#status{
+  margin-top:15px;
+  opacity:0.8;
+}
+
+.stats{
+  margin-top:10px;
+  opacity:0.7;
+}
+
+.url-item{
+  background:#11141c;
+  padding:14px;
+  border-radius:10px;
+  margin-top:12px;
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  gap:10px;
+  flex-wrap:wrap;
+}
+
+.url-item a{
+  color:#60a5fa;
+  text-decoration:none;
+  word-break:break-all;
+  flex:1;
+}
+
+.delete-btn{
+  background:#dc2626;
+  padding:8px 14px;
+  border:none;
+  border-radius:8px;
+  cursor:pointer;
+  color:white;
+}
+
+.delete-btn:hover{
+  opacity:0.9;
+}
+
+small{
+  opacity:0.7;
+}
+
 </style>
 </head>
 <body>
 
-<h1>🔥 GitHub URL Saver</h1>
+<div class="container">
 
-<input id="urlInput" placeholder="Enter URL">
+  <h1>🔥 GitHub URL Manager</h1>
 
-<button onclick="addUrl()">Add URL</button>
+  <div class="card">
 
-<div id="status"></div>
+    <h2>Add URLs</h2>
 
-<div id="list"></div>
+    <small>
+      Paste one URL per line
+    </small>
+
+    <textarea id="urlInput" placeholder="https://github.com/example/file1.html
+https://github.com/example/file2.js"></textarea>
+
+    <button onclick="addUrls()">
+      Add URLs
+    </button>
+
+    <div id="status"></div>
+
+    <div class="stats" id="stats">
+      0 URLs stored
+    </div>
+
+  </div>
+
+  <div class="card">
+
+    <h2>Stored URLs</h2>
+
+    <div id="urlList"></div>
+
+  </div>
+
+</div>
 
 <script>
 
-const TOKEN = "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";
-const OWNER = "kaushalhaladibhat";
+const TOKEN = "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"; 
+const OWNER = "kaushalhaladibhat"; 
 const REPO = "allrepos";
 
 const FILE_PATH = "urls.json";
 
+const urlInput = document.getElementById("urlInput");
+const urlList = document.getElementById("urlList");
+const stats = document.getElementById("stats");
+const statusDiv = document.getElementById("status");
+
 async function getFile(){
 
-  const res = await fetch(
+  const response = await fetch(
     `https://api.github.com/repos/${OWNER}/${REPO}/contents/${FILE_PATH}`,
     {
       headers:{
@@ -77,7 +177,7 @@ async function getFile(){
     }
   );
 
-  if(res.status === 404){
+  if(response.status === 404){
 
     return {
       urls:[],
@@ -86,42 +186,29 @@ async function getFile(){
 
   }
 
-  const data = await res.json();
+  const data = await response.json();
 
-  const content = atob(data.content);
+  const decoded = atob(data.content);
+
+  const parsed = JSON.parse(decoded);
 
   return {
-    urls:JSON.parse(content).urls || [],
+    urls:parsed.urls || [],
     sha:data.sha
   };
+
 }
 
-async function addUrl(){
+async function updateGitHub(urls,sha){
 
-  const input = document.getElementById("urlInput");
-
-  const url = input.value.trim();
-
-  if(!url) return;
-
-  document.getElementById("status").innerText = "Updating GitHub...";
-
-  const file = await getFile();
-
-  const urls = file.urls;
-
-  if(!urls.includes(url)){
-    urls.push(url);
-  }
-
-  const updatedData = {
+  const jsonData = {
     updated:new Date().toISOString(),
     total:urls.length,
     urls:urls
   };
 
   const encoded = btoa(
-    JSON.stringify(updatedData,null,2)
+    JSON.stringify(jsonData,null,2)
   );
 
   const body = {
@@ -129,11 +216,11 @@ async function addUrl(){
     content:encoded
   };
 
-  if(file.sha){
-    body.sha = file.sha;
+  if(sha){
+    body.sha = sha;
   }
 
-  const res = await fetch(
+  const response = await fetch(
     `https://api.github.com/repos/${OWNER}/${REPO}/contents/${FILE_PATH}`,
     {
       method:"PUT",
@@ -145,47 +232,119 @@ async function addUrl(){
     }
   );
 
-  if(res.ok){
+  return response.ok;
 
-    document.getElementById("status").innerText =
-      "✅ urls.json updated in GitHub repo";
+}
 
-    input.value = "";
+async function addUrls(){
+
+  const enteredUrls = urlInput.value
+    .split("\n")
+    .map(url => url.trim())
+    .filter(url => url.length > 0);
+
+  if(enteredUrls.length === 0){
+    return;
+  }
+
+  statusDiv.innerText = "Updating GitHub...";
+
+  const file = await getFile();
+
+  const urls = file.urls;
+
+  enteredUrls.forEach(url => {
+
+    if(!urls.includes(url)){
+      urls.push(url);
+    }
+
+  });
+
+  const success = await updateGitHub(
+    urls,
+    file.sha
+  );
+
+  if(success){
+
+    statusDiv.innerText =
+      "✅ urls.json updated successfully";
+
+    urlInput.value = "";
 
     loadUrls();
 
   }else{
 
-    document.getElementById("status").innerText =
-      "❌ Failed";
+    statusDiv.innerText =
+      "❌ Failed to update GitHub";
 
-    console.log(await res.text());
   }
+
+}
+
+async function deleteUrl(index){
+
+  statusDiv.innerText = "Deleting URL...";
+
+  const file = await getFile();
+
+  const urls = file.urls;
+
+  urls.splice(index,1);
+
+  const success = await updateGitHub(
+    urls,
+    file.sha
+  );
+
+  if(success){
+
+    statusDiv.innerText =
+      "🗑️ URL deleted";
+
+    loadUrls();
+
+  }else{
+
+    statusDiv.innerText =
+      "❌ Failed deleting URL";
+
+  }
+
 }
 
 async function loadUrls(){
 
   const file = await getFile();
 
-  const list = document.getElementById("list");
+  urlList.innerHTML = "";
 
-  list.innerHTML = "";
-
-  file.urls.forEach(url=>{
+  file.urls.forEach((url,index)=>{
 
     const div = document.createElement("div");
 
-    div.className = "item";
+    div.className = "url-item";
 
     div.innerHTML = `
-      <a href="${url}" target="_blank" style="color:#60a5fa;">
+      <a href="${url}" target="_blank">
         ${url}
       </a>
+
+      <button class="delete-btn"
+        onclick="deleteUrl(${index})">
+        Delete
+      </button>
     `;
 
-    list.appendChild(div);
+    urlList.appendChild(div);
 
   });
+
+  stats.innerText =
+    file.urls.length + " URLs stored";
+
 }
 
 loadUrls();
