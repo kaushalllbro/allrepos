@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GitHub JSON URL Saver</title>
+
+<style>
+body{
+  background:#0f1117;
+  color:white;
+  font-family:Arial;
+  padding:20px;
+}
+
+input{
+  width:100%;
+  padding:14px;
+  border:none;
+  border-radius:10px;
+  margin-bottom:10px;
+  background:#1f2937;
+  color:white;
+}
+
+button{
+  padding:12px 20px;
+  border:none;
+  border-radius:10px;
+  cursor:pointer;
+  background:#4f46e5;
+  color:white;
+  font-size:16px;
+}
+
+#list{
+  margin-top:20px;
+}
+
+.item{
+  background:#1a1d26;
+  padding:12px;
+  margin-top:10px;
+  border-radius:10px;
+  word-break:break-all;
+}
+</style>
+</head>
+<body>
+
+<h1>🔥 GitHub URL Saver</h1>
+
+<input id="urlInput" placeholder="Enter URL">
+
+<button onclick="addUrl()">Add URL</button>
+
+<div id="status"></div>
+
+<div id="list"></div>
+
+<script>
+
+const TOKEN = "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";
+const OWNER = "kaushalhaladibhat";
+const REPO = "allrepos";
+
+const FILE_PATH = "urls.json";
+
+async function getFile(){
+
+  const res = await fetch(
+    `https://api.github.com/repos/${OWNER}/${REPO}/contents/${FILE_PATH}`,
+    {
+      headers:{
+        Authorization:`token ${TOKEN}`
+      }
+    }
+  );
+
+  if(res.status === 404){
+
+    return {
+      urls:[],
+      sha:null
+    };
+
+  }
+
+  const data = await res.json();
+
+  const content = atob(data.content);
+
+  return {
+    urls:JSON.parse(content).urls || [],
+    sha:data.sha
+  };
+}
+
+async function addUrl(){
+
+  const input = document.getElementById("urlInput");
+
+  const url = input.value.trim();
+
+  if(!url) return;
+
+  document.getElementById("status").innerText = "Updating GitHub...";
+
+  const file = await getFile();
+
+  const urls = file.urls;
+
+  if(!urls.includes(url)){
+    urls.push(url);
+  }
+
+  const updatedData = {
+    updated:new Date().toISOString(),
+    total:urls.length,
+    urls:urls
+  };
+
+  const encoded = btoa(
+    JSON.stringify(updatedData,null,2)
+  );
+
+  const body = {
+    message:"Updated urls.json",
+    content:encoded
+  };
+
+  if(file.sha){
+    body.sha = file.sha;
+  }
+
+  const res = await fetch(
+    `https://api.github.com/repos/${OWNER}/${REPO}/contents/${FILE_PATH}`,
+    {
+      method:"PUT",
+      headers:{
+        Authorization:`token ${TOKEN}`,
+        "Content-Type":"application/json"
+      },
+      body:JSON.stringify(body)
+    }
+  );
+
+  if(res.ok){
+
+    document.getElementById("status").innerText =
+      "✅ urls.json updated in GitHub repo";
+
+    input.value = "";
+
+    loadUrls();
+
+  }else{
+
+    document.getElementById("status").innerText =
+      "❌ Failed";
+
+    console.log(await res.text());
+  }
+}
+
+async function loadUrls(){
+
+  const file = await getFile();
+
+  const list = document.getElementById("list");
+
+  list.innerHTML = "";
+
+  file.urls.forEach(url=>{
+
+    const div = document.createElement("div");
+
+    div.className = "item";
+
+    div.innerHTML = `
+      <a href="${url}" target="_blank" style="color:#60a5fa;">
+        ${url}
+      </a>
+    `;
+
+    list.appendChild(div);
+
+  });
+}
+
+loadUrls();
+
+</script>
+
+</body>
+</html>
