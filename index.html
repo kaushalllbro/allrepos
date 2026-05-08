@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>GitHub URL Manager</title>
+<title>AllRepos URL Manager</title>
 
 <style>
 
@@ -33,28 +33,28 @@ h1{
 .card{
   background:#1a1d26;
   padding:20px;
-  border-radius:15px;
+  border-radius:16px;
   margin-bottom:20px;
 }
 
 textarea{
   width:100%;
   height:180px;
-  padding:15px;
   border:none;
   outline:none;
-  border-radius:12px;
+  resize:vertical;
   background:#0b0d12;
   color:white;
-  resize:vertical;
+  border-radius:12px;
+  padding:15px;
   margin-top:15px;
   font-size:15px;
 }
 
 button{
   background:#4f46e5;
-  color:white;
   border:none;
+  color:white;
   padding:12px 22px;
   border-radius:10px;
   cursor:pointer;
@@ -118,7 +118,7 @@ small{
 
 <div class="container">
 
-  <h1>🔥 GitHub URL Manager</h1>
+  <h1>🔥 AllRepos URL Manager</h1>
 
   <div class="card">
 
@@ -155,8 +155,17 @@ https://github.com/example/file2.js"></textarea>
 
 <script>
 
-const TOKEN = "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"; 
-const OWNER = "kaushalllbro"; 
+/* =========================
+   PUT YOUR TOKEN HERE
+========================= */
+
+const TOKEN = "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";
+
+/* =========================
+   YOUR REPO DETAILS
+========================= */
+
+const OWNER = "kaushalllbro";
 const REPO = "allrepos";
 
 const FILE_PATH = "urls.json";
@@ -166,13 +175,17 @@ const urlList = document.getElementById("urlList");
 const stats = document.getElementById("stats");
 const statusDiv = document.getElementById("status");
 
+/* =========================
+   FETCH urls.json
+========================= */
+
 async function getFile(){
 
   const response = await fetch(
     `https://api.github.com/repos/${OWNER}/${REPO}/contents/${FILE_PATH}`,
     {
       headers:{
-        Authorization:`token ${TOKEN}`
+        Authorization:`Bearer ${TOKEN}`
       }
     }
   );
@@ -186,11 +199,36 @@ async function getFile(){
 
   }
 
+  if(response.status === 401){
+
+    statusDiv.innerText =
+      "❌ Invalid token or permissions";
+
+    throw new Error("401 Unauthorized");
+
+  }
+
   const data = await response.json();
 
-  const decoded = atob(data.content);
+  let parsed = { urls:[] };
 
-  const parsed = JSON.parse(decoded);
+  try{
+
+    const decoded = decodeURIComponent(
+      escape(
+        atob(data.content)
+      )
+    );
+
+    parsed = JSON.parse(decoded);
+
+  }catch(err){
+
+    console.log(err);
+
+    parsed = { urls:[] };
+
+  }
 
   return {
     urls:parsed.urls || [],
@@ -198,6 +236,10 @@ async function getFile(){
   };
 
 }
+
+/* =========================
+   UPDATE urls.json
+========================= */
 
 async function updateGitHub(urls,sha){
 
@@ -208,7 +250,11 @@ async function updateGitHub(urls,sha){
   };
 
   const encoded = btoa(
-    JSON.stringify(jsonData,null,2)
+    unescape(
+      encodeURIComponent(
+        JSON.stringify(jsonData,null,2)
+      )
+    )
   );
 
   const body = {
@@ -225,7 +271,7 @@ async function updateGitHub(urls,sha){
     {
       method:"PUT",
       headers:{
-        Authorization:`token ${TOKEN}`,
+        Authorization:`Bearer ${TOKEN}`,
         "Content-Type":"application/json"
       },
       body:JSON.stringify(body)
@@ -235,6 +281,10 @@ async function updateGitHub(urls,sha){
   return response.ok;
 
 }
+
+/* =========================
+   ADD URLS
+========================= */
 
 async function addUrls(){
 
@@ -247,103 +297,137 @@ async function addUrls(){
     return;
   }
 
-  statusDiv.innerText = "Updating GitHub...";
+  statusDiv.innerText =
+    "⏳ Updating GitHub...";
 
-  const file = await getFile();
+  try{
 
-  const urls = file.urls;
+    const file = await getFile();
 
-  enteredUrls.forEach(url => {
+    const urls = file.urls;
 
-    if(!urls.includes(url)){
-      urls.push(url);
+    enteredUrls.forEach(url => {
+
+      if(!urls.includes(url)){
+        urls.push(url);
+      }
+
+    });
+
+    const success = await updateGitHub(
+      urls,
+      file.sha
+    );
+
+    if(success){
+
+      statusDiv.innerText =
+        "✅ urls.json updated successfully";
+
+      urlInput.value = "";
+
+      loadUrls();
+
+    }else{
+
+      statusDiv.innerText =
+        "❌ Failed updating GitHub";
+
     }
 
-  });
+  }catch(err){
 
-  const success = await updateGitHub(
-    urls,
-    file.sha
-  );
-
-  if(success){
-
-    statusDiv.innerText =
-      "✅ urls.json updated successfully";
-
-    urlInput.value = "";
-
-    loadUrls();
-
-  }else{
-
-    statusDiv.innerText =
-      "❌ Failed to update GitHub";
+    console.log(err);
 
   }
 
 }
+
+/* =========================
+   DELETE URL
+========================= */
 
 async function deleteUrl(index){
 
-  statusDiv.innerText = "Deleting URL...";
+  statusDiv.innerText =
+    "⏳ Deleting URL...";
 
-  const file = await getFile();
+  try{
 
-  const urls = file.urls;
+    const file = await getFile();
 
-  urls.splice(index,1);
+    const urls = file.urls;
 
-  const success = await updateGitHub(
-    urls,
-    file.sha
-  );
+    urls.splice(index,1);
 
-  if(success){
+    const success = await updateGitHub(
+      urls,
+      file.sha
+    );
 
-    statusDiv.innerText =
-      "🗑️ URL deleted";
+    if(success){
 
-    loadUrls();
+      statusDiv.innerText =
+        "🗑️ URL deleted";
 
-  }else{
+      loadUrls();
 
-    statusDiv.innerText =
-      "❌ Failed deleting URL";
+    }else{
+
+      statusDiv.innerText =
+        "❌ Failed deleting";
+
+    }
+
+  }catch(err){
+
+    console.log(err);
 
   }
 
 }
 
+/* =========================
+   LOAD URLS
+========================= */
+
 async function loadUrls(){
 
-  const file = await getFile();
+  try{
 
-  urlList.innerHTML = "";
+    const file = await getFile();
 
-  file.urls.forEach((url,index)=>{
+    urlList.innerHTML = "";
 
-    const div = document.createElement("div");
+    file.urls.forEach((url,index)=>{
 
-    div.className = "url-item";
+      const div = document.createElement("div");
 
-    div.innerHTML = `
-      <a href="${url}" target="_blank">
-        ${url}
-      </a>
+      div.className = "url-item";
 
-      <button class="delete-btn"
-        onclick="deleteUrl(${index})">
-        Delete
-      </button>
-    `;
+      div.innerHTML = `
+        <a href="${url}" target="_blank">
+          ${url}
+        </a>
 
-    urlList.appendChild(div);
+        <button class="delete-btn"
+          onclick="deleteUrl(${index})">
+          Delete
+        </button>
+      `;
 
-  });
+      urlList.appendChild(div);
 
-  stats.innerText =
-    file.urls.length + " URLs stored";
+    });
+
+    stats.innerText =
+      file.urls.length + " URLs stored";
+
+  }catch(err){
+
+    console.log(err);
+
+  }
 
 }
 
